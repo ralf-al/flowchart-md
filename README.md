@@ -6,77 +6,79 @@
   </picture>
 </p>
 
-<p align="center"><b>Print a flowchart as markdown.</b><br>An agent shows the branch in chat, in the markdown it already writes.</p>
+<p align="center"><b>Visualize logic with agents.</b><br>Ask how something works. The flowchart shows up in the chat.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/MCP-server-1b1b19?style=flat-square" alt="MCP server">
-  <img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later">
-  <img src="https://img.shields.io/badge/renderer-MIT-1b1b19?style=flat-square" alt="Renderer is MIT">
 </p>
 
 ```text
-┌─────────────────┐
-│                 │
-│   Form submit   │
-│                 │
-└────────┬────────┘
-         │
-         │
-         │
-         │
-         ▼
-◇─────────────────◇
-│                 │
-│  Fields valid?  ├────────────┐
-│                 │            │
-◇────────┬────────◇           Yes
-         │                     │
-        No                     │
-         │                     │
-         │                     │
-         ▼                     ▼
-┌─────────────────┐     ┌─────────────┐
-│                 │     │             │
-│   Show errors   │     │ POST /login │
-│                 │     │             │
-└─────────────────┘     └──────┬──────┘
-                               │
-                               │
-                               │
-                               │
-                               │
-◇─────────────────◇            │
-│                 │            │
-│ Credentials ok? ├◄───────────┤
-│                 │            │
-◇────────┬────────◇           Yes
-         │                     │
-        No                     │
-         │                     │
-         │                     │
-         ▼                     ▼
-┌─────────────────┐     ┌─────────────┐
-│                 │     │             │
-│       401       │     │ Set session │
-│                 │     │             │
-└─────────────────┘     └──────┬──────┘
-                               │
-                               │
-                               │
-                               │
-                               │
-┌─────────────────┐            │
-│                 │            │
-│  Redirect home  │◄───────────┘
-│                 │
-└─────────────────┘
+┌──────────────┐
+│              │
+│    Submit    │
+│              │
+└───────┬──────┘
+        │
+        │
+        │
+        │
+        ▼
+◇──────────────◇
+│              │
+│  Fields ok?  ├────────────┐
+│              │            │
+◇───────┬──────◇           Yes
+        │                   │
+       No                   │
+        │                   │
+        │                   │
+        ▼                   ▼
+┌──────────────┐     ┌─────────────┐
+│              │     │             │
+│ Show errors  │     │ POST /login │
+│              │     │             │
+└──────────────┘     └──────┬──────┘
+                            │
+                            │
+                            │
+                            │
+                            │
+◇──────────────◇            │
+│              │            │
+│ Password ok? ├◄───────────┤
+│              │            │
+◇───────┬──────◇           Yes
+        │                   │
+       No                   │
+        │                   │
+        │                   │
+        ▼                   ▼
+┌──────────────┐     ┌─────────────┐
+│              │     │             │
+│     401      │     │     Home    │
+│              │     │             │
+└──────────────┘     └─────────────┘
 ```
 
-<p align="center"><sub>A sign-in, as it shows up in chat. The form checks the fields. The server checks the credentials.</sub></p>
+<p align="center"><sub>A sign-in. The form checks the fields. The server checks the password.</sub></p>
+
+## Why
+
+It is easier to understand a system when you can see it. A flowchart lets you and the agent look at the same picture: where a request starts, which checks it passes, and where it ends. Change the design, ask again, and look at the next picture.
 
 ## Install
 
-Add this to the MCP client. In Cursor, that is `.cursor/mcp.json`.
+### Claude Code
+
+```sh
+claude mcp add --scope user flowchart-md -- npx -y github:ralf-al/flowchart-md
+```
+
+Then ask Claude to draw how a sign-in works. The flowchart shows up in the chat.
+
+### Cursor
+
+Add this to `.cursor/mcp.json`:
 
 ```json
 {
@@ -89,11 +91,19 @@ Add this to the MCP client. In Cursor, that is `.cursor/mcp.json`.
 }
 ```
 
-Reload the server, then ask for a flowchart of the logic you want to check. The tool is `render-flowchart`. It returns a markdown code block. The agent pastes that block into the reply unchanged.
+Reload MCP, then ask the agent to draw the logic.
 
-Node 24 or later.
+### Other agents
+
+Any MCP client can run the same server:
+
+```sh
+npx -y github:ralf-al/flowchart-md
+```
 
 ## Examples
+
+Use a syntax agents are already great at: Mermaid.
 
 ### Save
 
@@ -328,12 +338,6 @@ graph TD
 │             │     │               │
 └─────────────┘     └───────────────┘
 ```
-
-## Why
-
-Conditional logic is where an explanation goes wrong quietly. "If the call fails and retries are left, wait and try again, otherwise fail" is easy to nod at and easy to swap. Drawn out, each answer is its own arrow. You can see which question it leaves and which box it enters.
-
-That is the use. An agent reaches for this when it is walking a user through a request: a form check, an auth check, a stock check, a status code. The diagram is there so the user can verify the condition.
 
 ## Usage
 
