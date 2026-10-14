@@ -394,6 +394,7 @@ export function offsetDrawingForSubgraphs(graph: AsciiGraph): void {
 export function createMapping(graph: AsciiGraph): void {
   const dir = graph.config.graphDirection
   const highestPositionPerLevel: number[] = new Array(100).fill(0)
+  const ownedChildren = buildOwnedChildren(graph)
 
   // Identify root nodes — nodes that aren't the target of any edge
   const nodesFound = new Set<string>()
@@ -511,11 +512,13 @@ export function createMapping(graph: AsciiGraph): void {
         const requested: GridCoord = edgeDir === 'LR'
           ? { x: childLevel, y: highestPosition }
           : { x: highestPosition, y: childLevel }
-        reserveSpotInGrid(graph, graph.nodes[child.index]!, requested, edgeDir)
+        const reserved = reserveSpotInGrid(graph, graph.nodes[child.index]!, requested, edgeDir)
 
-        // Only update level tracker for same-direction placements
+        // Reserve the whole subtree, so the next sibling starts after it
+        // instead of in the slot the children still need.
         if (edgeDir === graph.config.graphDirection) {
-          highestPositionPerLevel[childLevel] = highestPosition + 4
+          const placedCross = edgeDir === 'LR' ? reserved.y : reserved.x
+          highestPositionPerLevel[childLevel] = placedCross + subtreeSpan(graph, child, ownedChildren)
         }
         placedCount++
       }
@@ -530,6 +533,7 @@ export function createMapping(graph: AsciiGraph): void {
   for (const node of graph.nodes) {
     setColumnWidth(graph, node)
   }
+  equalizeSiblingBoxes(graph, ownedChildren)
 
   // Analyze edges for bundling (parallel links like A & B --> C)
   // This groups edges that share sources or targets for cleaner visualization
@@ -551,6 +555,8 @@ export function createMapping(graph: AsciiGraph): void {
     increaseGridSizeForPath(graph, edge.path)
     determineLabelLine(graph, edge)
   }
+
+  equalizeSiblingBoxes(graph, ownedChildren)
 
   // Convert grid coords → drawing coords and generate box drawings
   for (const node of graph.nodes) {
@@ -608,23 +614,27 @@ function centerParentsOverChildren(graph: AsciiGraph): void {
     let minCross = Number.NEGATIVE_INFINITY
     for (const node of ordered) {
       const wanted = desired.get(node) ?? crossOf(node)
-      const candidates = [wanted, crossOf(node), Math.max(wanted, minCross)]
       let placedCross = Math.max(wanted, minCross)
-      for (const candidate of candidates) {
-        const cross = Math.max(candidate, minCross)
-        const origin = flow === 'LR'
-          ? { x: level, y: cross }
-          : { x: cross, y: level }
-        if (reservationFree(graph, origin, node)) {
-          placedCross = cross
-          break
+      let found = false
+      for (let delta = 0; delta < 40 && !found; delta++) {
+        const options = delta === 0 ? [wanted] : [wanted - delta, wanted + delta]
+        for (const candidate of options) {
+          const cross = Math.max(candidate, minCross)
+          const origin = flow === 'LR'
+            ? { x: level, y: cross }
+            : { x: cross, y: level }
+          if (reservationFree(graph, origin, node) && columnsClear(graph, origin, node, flow)) {
+            placedCross = cross
+            found = true
+            break
+          }
         }
       }
       const origin: GridCoord = flow === 'LR'
         ? { x: level, y: placedCross }
         : { x: placedCross, y: level }
       let guard = 0
-      while (!reservationFree(graph, origin, node) && guard < 20) {
+      while ((!reservationFree(graph, origin, node) || !columnsClear(graph, origin, node, flow)) && guard < 20) {
         if (flow === 'LR') origin.y += 4
         else origin.x += 4
         guard++
@@ -647,6 +657,31 @@ function countForwardParents(
     if (edge.to === node && edge.from.gridCoord && levelOf(edge.from) < level) count++
   }
   return count
+}
+
+/**
+ * True when this spot does not use a column or row another node already draws in,
+ * unless the two nodes are stacked on the same line.
+ * Shared tracks are what make one sibling box wider than the other.
+ */
+function columnsClear(
+  graph: AsciiGraph,
+  origin: GridCoord,
+  node: AsciiNode,
+  flow: 'TD' | 'LR',
+): boolean {
+  const cross = flow === 'LR' ? origin.y : origin.x
+  const content = cross + 1
+  for (const other of graph.nodes) {
+    if (other === node || !other.gridCoord) continue
+    const otherCross = flow === 'LR' ? other.gridCoord.y : other.gridCoord.x
+    if (otherCross === cross) continue
+    const otherContent = otherCross + 1
+    const sharesContent = (otherContent >= cross && otherContent <= cross + 2)
+      || (content >= otherCross && content <= otherCross + 2)
+    if (sharesContent) return false
+  }
+  return true
 }
 
 function reservationFree(graph: AsciiGraph, origin: GridCoord, node: AsciiNode): boolean {
@@ -679,6 +714,202 @@ function relocateNode(graph: AsciiGraph, node: AsciiNode, origin: GridCoord): vo
     }
   }
   node.gridCoord = origin
+}
+
+/**
+ * Each node is placed by the first parent the layout reaches.
+ * Later edges to that node are joins, not extra branches to reserve space for.
+ */
+function buildOwnedChildren(graph: AsciiGraph): Map<AsciiNode, AsciiNode[]> {
+  const owned = new Map<AsciiNode, AsciiNode[]>()
+  const placed = new Set<AsciiNode>()
+
+  for (const node of graph.nodes) {
+    const hasIncoming = graph.edges.some(edge => edge.to === node)
+    if (!hasIncoming) placed.add(node)
+  }
+
+  let progressed = true
+  while (progressed) {
+    progressed = false
+    for (const node of graph.nodes) {
+      if (!placed.has(node)) continue
+      const kids = owned.get(node) ?? []
+      for (const child of getChildren(graph, node)) {
+        if (placed.has(child)) continue
+        kids.push(child)
+        owned.set(node, kids)
+        placed.add(child)
+        progressed = true
+      }
+    }
+  }
+
+  return owned
+}
+
+/** How many grid slots a node needs, including the branches under it. A slot is 4. */
+function subtreeSpan(
+  graph: AsciiGraph,
+  node: AsciiNode,
+  owned: Map<AsciiNode, AsciiNode[]>,
+  memo = new Map<AsciiNode, number>(),
+): number {
+  const cached = memo.get(node)
+  if (cached !== undefined) return cached
+
+  const flow = graph.config.graphDirection
+  const kids = (owned.get(node) ?? []).filter(child => edgeFlow(graph, node, child) === flow)
+  let span = 4
+  if (kids.length === 1) span = Math.max(4, subtreeSpan(graph, kids[0]!, owned, memo))
+  else if (kids.length > 1) {
+    span = 0
+    for (const kid of kids) span += subtreeSpan(graph, kid, owned, memo)
+  }
+  memo.set(node, span)
+  return span
+}
+
+/**
+ * Make the empty tracks on either side of a decision the same width,
+ * so the two arrows come out the same length.
+ */
+function balanceBranchGaps(graph: AsciiGraph): void {
+  const flow: 'TD' | 'LR' = graph.config.graphDirection === 'LR' ? 'LR' : 'TD'
+  const tracks = flow === 'LR' ? graph.rowHeight : graph.columnWidth
+  const crossOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.y : node.gridCoord!.x
+  const levelOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.x : node.gridCoord!.y
+
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+    const cross = crossOf(node)
+    const level = levelOf(node)
+    const kids = getChildren(graph, node).filter(child => child.gridCoord && levelOf(child) > level)
+    const left = kids.filter(child => crossOf(child) < cross)
+    const right = kids.filter(child => crossOf(child) > cross)
+    if (left.length === 0 || right.length === 0) continue
+
+    const leftBorder = tracks.get(cross) ?? 0
+    const rightBorder = tracks.get(cross + 2) ?? 0
+    const border = Math.max(leftBorder, rightBorder)
+    tracks.set(cross, border)
+    tracks.set(cross + 2, border)
+
+    const leftCross = Math.max(...left.map(crossOf))
+    const rightCross = Math.min(...right.map(crossOf))
+    const leftGaps: number[] = []
+    for (let track = leftCross + 3; track < cross; track++) leftGaps.push(track)
+    const rightGaps: number[] = []
+    for (let track = cross + 3; track < rightCross; track++) rightGaps.push(track)
+
+    const pairs = Math.min(leftGaps.length, rightGaps.length)
+    for (let i = 0; i < pairs; i++) {
+      const leftTrack = leftGaps[leftGaps.length - 1 - i]!
+      const rightTrack = rightGaps[i]!
+      const width = Math.max(tracks.get(leftTrack) ?? 0, tracks.get(rightTrack) ?? 0)
+      tracks.set(leftTrack, width)
+      tracks.set(rightTrack, width)
+    }
+
+  }
+}
+
+/** Lengthen the shorter side of a branch so both arrows travel the same distance. */
+function matchBranchArrowLengths(graph: AsciiGraph): void {
+  const flow: 'TD' | 'LR' = graph.config.graphDirection === 'LR' ? 'LR' : 'TD'
+  const tracks = flow === 'LR' ? graph.rowHeight : graph.columnWidth
+  const crossOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.y : node.gridCoord!.x
+  const levelOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.x : node.gridCoord!.y
+  const boxTracks = new Set<number>()
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+    const cross = crossOf(node)
+    boxTracks.add(cross)
+    boxTracks.add(cross + 1)
+    boxTracks.add(cross + 2)
+  }
+
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+    const cross = crossOf(node)
+    const level = levelOf(node)
+    const kids = getChildren(graph, node).filter(child => child.gridCoord && levelOf(child) > level)
+    const left = kids.filter(child => crossOf(child) < cross)
+    const right = kids.filter(child => crossOf(child) > cross)
+    if (left.length === 0 || right.length === 0) continue
+
+    const leftCross = Math.max(...left.map(crossOf))
+    const rightCross = Math.min(...right.map(crossOf))
+    const leftGaps = []
+    for (let track = leftCross + 3; track < cross; track++) {
+      if (!boxTracks.has(track)) leftGaps.push(track)
+    }
+    const rightGaps = []
+    for (let track = cross + 3; track < rightCross; track++) {
+      if (!boxTracks.has(track)) rightGaps.push(track)
+    }
+
+    const leftKid = left.reduce((best, child) => crossOf(child) > crossOf(best) ? child : best)
+    const rightKid = right.reduce((best, child) => crossOf(child) < crossOf(best) ? child : best)
+    const parentCenter = boxCenter(graph, node, flow)
+    const leftDist = parentCenter - boxCenter(graph, leftKid, flow)
+    const rightDist = boxCenter(graph, rightKid, flow) - parentCenter
+    if (leftDist < rightDist && leftGaps.length > 0) {
+      const track = leftGaps[leftGaps.length - 1]!
+      tracks.set(track, (tracks.get(track) ?? 0) + (rightDist - leftDist))
+    } else if (rightDist < leftDist && rightGaps.length > 0) {
+      const track = rightGaps[0]!
+      tracks.set(track, (tracks.get(track) ?? 0) + (leftDist - rightDist))
+    }
+  }
+}
+
+/** Character position of the middle of a node's box on the cross axis. */
+function boxCenter(graph: AsciiGraph, node: AsciiNode, flow: 'TD' | 'LR'): number {
+  const gc = node.gridCoord!
+  const cross = flow === 'LR' ? gc.y : gc.x
+  const tracks = flow === 'LR' ? graph.rowHeight : graph.columnWidth
+  let start = 0
+  for (let i = 0; i < cross; i++) start += tracks.get(i) ?? 0
+  const origin = start + Math.floor((tracks.get(cross) ?? 0) / 2)
+  const span = (tracks.get(cross) ?? 0) + (tracks.get(cross + 1) ?? 0)
+  return origin + Math.floor(span / 2)
+}
+
+/** Direction this edge is laid out in. A subgraph can override it for its own nodes. */
+function edgeFlow(graph: AsciiGraph, parent: AsciiNode, child: AsciiNode): 'LR' | 'TD' {
+  const parentSg = getNodeSubgraph(graph, parent)
+  const childSg = getNodeSubgraph(graph, child)
+  if (parentSg && parentSg === childSg && parentSg.direction) return parentSg.direction
+  return graph.config.graphDirection
+}
+
+/**
+ * Sibling boxes share one size.
+ * Otherwise a short label stays narrow while the next answer inherits a wide column,
+ * and the two arrows leave the decision at different lengths.
+ */
+function equalizeSiblingBoxes(graph: AsciiGraph, owned: Map<AsciiNode, AsciiNode[]>): void {
+  for (const kids of owned.values()) {
+    if (kids.length < 2) continue
+    let content = 0
+    let top = 0
+    let middle = 0
+    for (const kid of kids) {
+      const gc = kid.gridCoord
+      if (!gc) continue
+      content = Math.max(content, graph.columnWidth.get(gc.x + 1) ?? 0)
+      top = Math.max(top, graph.rowHeight.get(gc.y) ?? 0)
+      middle = Math.max(middle, graph.rowHeight.get(gc.y + 1) ?? 0)
+    }
+    for (const kid of kids) {
+      const gc = kid.gridCoord
+      if (!gc) continue
+      graph.columnWidth.set(gc.x + 1, content)
+      graph.rowHeight.set(gc.y, top)
+      graph.rowHeight.set(gc.y + 1, middle)
+    }
+  }
 }
 
 // ============================================================================

@@ -1,8 +1,8 @@
 {
-  "mcpServers": {
-    "flowchart-md": {
-      "command": "npx",
-      "args": ["-y", "github:ralf-al/flowchart-md"]
+    "mcpServers": {
+      "flowchart-md": {
+        "command": "npx",
+        "args": ["-y", "github:ralf-al/flowchart-md"]
+      }
     }
   }
-}

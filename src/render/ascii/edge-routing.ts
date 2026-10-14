@@ -165,6 +165,18 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   const [preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir] =
     determineStartAndEndDir(edge, effectiveDir)
 
+  // Keep every answer of a decision on the same row. A* may jog the outer
+  // branch down a cell, which drops that label below the others.
+  if (downstreamCount(graph, edge, effectiveDir) >= 2) {
+    const elbow = branchElbow(graph, edge, effectiveDir)
+    if (elbow) {
+      edge.startDir = preferredDir
+      edge.endDir = preferredOppositeDir
+      edge.path = elbow
+      return
+    }
+  }
+
   // A node with one next step leaves through the bottom (top-to-bottom) or
   // the right (left-to-right), even when that step sits a little to the side.
   // A branch with several answers keeps the side exits.
@@ -197,7 +209,10 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
     preferredPath = mergePath(preferredPath)
     alternativePath = mergePath(alternativePath)
 
-    if (preferredPath.length <= alternativePath.length) {
+    // A decision keeps the side exit. The shorter route otherwise drops
+    // through the middle answer and hooks out underneath it.
+    const keepSideExit = downstreamCount(graph, edge, effectiveDir) >= 2
+    if (keepSideExit || preferredPath.length <= alternativePath.length) {
       edge.startDir = preferredDir
       edge.endDir = preferredOppositeDir
       edge.path = preferredPath
@@ -232,6 +247,65 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   edge.startDir = preferredDir
   edge.endDir = preferredOppositeDir
   edge.path = [prefFrom, prefTo]
+}
+
+/**
+ * One horizontal run on the exit row, then a drop into the target.
+ * Returns null when a node sits on that run.
+ */
+function branchElbow(graph: AsciiGraph, edge: AsciiEdge, flow: string): GridCoord[] | null {
+  const from = edge.from.gridCoord
+  const to = edge.to.gridCoord
+  if (!from || !to) return null
+
+  const d = determineDirection(from, to)
+  const side = flow === 'TD'
+    ? (dirEquals(d, LowerLeft) || dirEquals(d, UpperLeft) ? Left : Right)
+    : (dirEquals(d, UpperLeft) || dirEquals(d, UpperRight) ? Up : Down)
+  const into = flow === 'TD' ? Up : Left
+  const start = gridCoordDirection(from, side)
+  const end = gridCoordDirection(to, into)
+  const corner = flow === 'TD' ? { x: end.x, y: start.y } : { x: start.x, y: end.y }
+
+  if (!corridorFree(graph, start, corner, end)) return null
+  if (corner.x === start.x && corner.y === start.y) return [start, end]
+  if (corner.x === end.x && corner.y === end.y) return [start, end]
+  return [start, corner, end]
+}
+
+/** True when every cell of the elbow is empty, apart from the two ends on the node borders. */
+function corridorFree(graph: AsciiGraph, start: GridCoord, corner: GridCoord, end: GridCoord): boolean {
+  const points = [start, corner, end]
+  for (let segment = 0; segment < points.length - 1; segment++) {
+    const a = points[segment]!
+    const b = points[segment + 1]!
+    const dx = Math.sign(b.x - a.x)
+    const dy = Math.sign(b.y - a.y)
+    let x = a.x
+    let y = a.y
+    while (x !== b.x || y !== b.y) {
+      const onEnd = (x === start.x && y === start.y) || (x === end.x && y === end.y)
+      if (!onEnd && graph.grid.has(`${x},${y}`)) return false
+      x += dx
+      y += dy
+    }
+  }
+  return true
+}
+
+/** How many edges from this node step further along the flow. */
+function downstreamCount(graph: AsciiGraph, edge: AsciiEdge, flow: string): number {
+  const from = edge.from.gridCoord
+  if (!from) return 0
+  let count = 0
+  for (const other of graph.edges) {
+    if (other.from !== edge.from || !other.to.gridCoord) continue
+    const further = flow === 'TD'
+      ? other.to.gridCoord.y > from.y
+      : other.to.gridCoord.x > from.x
+    if (further) count++
+  }
+  return count
 }
 
 /** True when this edge is the source node's only step further along the flow. */

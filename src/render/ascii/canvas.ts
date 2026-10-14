@@ -296,7 +296,7 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
       for (let x = 0; x <= maxX; x++) {
         line += canvas[x]![y]!
       }
-      lines.push(line)
+      lines.push(line.trimEnd())
     } else {
       // Colored output — collect chars and roles for this row
       const chars: string[] = []

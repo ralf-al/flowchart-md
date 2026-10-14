@@ -13,51 +13,51 @@
 </p>
 
 ```text
-                     ┌────────────────┐                         
-                     │                │                         
-                     │     Submit     │                         
-                     │                │                         
-                     └────────┬───────┘                         
-                              │                                 
-                              │                                 
-                              │                                 
-                              │                                 
-                              ▼                                 
-                     ◇────────────────◇                         
-                     │                │                         
-       ┌─────────────┤   Fields ok?   ├──────────┐              
-       │             │                │          │              
-       │             ◇────────────────◇          │              
-      No                                        Yes             
-       │                                         │              
-       │                                         │              
-       │                                         │              
-       ▼                                         ▼              
-┌─────────────┐                          ┌──────────────┐       
-│             │                          │              │       
-│ Show errors │                          │ POST /login  │       
-│             │                          │              │       
-└─────────────┘                          └───────┬──────┘       
-                                                 │              
-                                                 │              
-                                                 │              
-                                                 │              
-                                                 ▼              
-                                         ◇──────────────◇       
-                                         │              │       
-                                      ┌──┤ Password ok? ├───┐   
-                                      │  │              │   │   
-                                      │  ◇──────────────◇   │   
-                                     No                    Yes  
-                                      │                     │   
-                                      │                     │   
-                                      │                     │   
-                                      ▼                     ▼   
-                              ┌────────────────┐        ┌──────┐
-                              │                │        │      │
-                              │      401       │        │ Home │
-                              │                │        │      │
-                              └────────────────┘        └──────┘
+               ┌────────────┐
+               │            │
+               │   Submit   │
+               │            │
+               └──────┬─────┘
+                      │
+                      │
+                      │
+                      │
+                      ▼
+               ◇────────────◇
+               │            │
+        ┌──────┤ Fields ok? ├──────────────┐
+        │      │            │              │
+        │      ◇────────────◇              │
+       No                                 Yes
+        │                                  │
+        │                                  │
+        │                                  │
+        ▼                                  ▼
+┌──────────────┐                   ┌──────────────┐
+│              │                   │              │
+│ Show errors  │                   │ POST /login  │
+│              │                   │              │
+└──────────────┘                   └───────┬──────┘
+                                           │
+                                           │
+                                           │
+                                           │
+                                           ▼
+                                   ◇──────────────◇
+                                   │              │
+                                ┌──┤ Password ok? ├───┐
+                                │  │              │   │
+                                │  ◇──────────────◇   │
+                               No                    Yes
+                                │                     │
+                                │                     │
+                                │                     │
+                                ▼                     ▼
+                            ┌──────┐              ┌──────┐
+                            │      │              │      │
+                            │ 401  │              │ Home │
+                            │      │              │      │
+                            └──────┘              └──────┘
 ```
 
 <p align="center"><sub>A sign-in. The form checks the fields. The server checks the password.</sub></p>
@@ -65,6 +65,10 @@
 ## Why
 
 Seeing the system makes it easier to understand, and easier to change. You and the agent look at the same picture: where a request starts, what it checks, and where it ends. Adjust the design, ask again, and the next picture is the next version.
+
+<h2 align="center">🚧</h2>
+
+<p align="center">npm publish is pending. The install below runs from GitHub with npx, so it does not need an npm release.</p>
 
 ## Install
 
@@ -109,6 +113,8 @@ Written in <img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> [
 
 The client only sends a change. The server then checks who is calling, then whether the body is valid, then writes.
 
+<img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> Mermaid
+
 ```mermaid
 graph TD
   A[Edit form] --> B{Dirty?}
@@ -122,79 +128,87 @@ graph TD
   I --> J[200 saved]
 ```
 
+<picture>
+  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
+  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
+  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
+</picture>
+
 ```text
-                 ┌───────────┐                                                        
-                 │           │                                                        
-                 │ Edit form │                                                        
-                 │           │                                                        
-                 └─────┬─────┘                                                        
-                       │                                                              
-                       │                                                              
-                       │                                                              
-                       │                                                              
-                       ▼                                                              
-                 ◇───────────◇                                                        
-                 │           │                                                        
-      ┌──────────┤   Dirty?  ├────────────────┐                                       
-      │          │           │                │                                       
-      │          ◇───────────◇                │                                       
-     No                                      Yes                                      
-      │                                       │                                       
-      │                                       │                                       
-      │                                       │                                       
-      ▼                                       ▼                                       
-┌──────────┐                        ┌───────────────────┐                             
-│          │                        │                   │                             
-│ Stay put │                        │   PUT /items/id   │                             
-│          │                        │                   │                             
-└──────────┘                        └─────────┬─────────┘                             
-                                              │                                       
-                                              │                                       
-                                              │                                       
-                                              │                                       
-                                              ▼                                       
-                                    ◇───────────────────◇                             
-                                    │                   │                             
-                       ┌────────────┤    Authorized?    ├─────────┐                   
-                       │            │                   │         │                   
-                       │            ◇───────────────────◇         │                   
-                      No                                         Yes                  
-                       │                                          │                   
-                       │                                          │                   
-                       │                                          │                   
-                       ▼                                          ▼                   
-                 ┌───────────┐                             ◇─────────────◇            
-                 │           │                             │             │            
-                 │    403    │                          ┌──┤ Valid body? ├─────┐      
-                 │           │                          │  │             │     │      
-                 └───────────┘                          │  ◇─────────────◇     │      
-                                                       No                     Yes     
-                                                        │                      │      
-                                                        │                      │      
-                                                        │                      │      
-                                                        │                      │      
-                                                        ▼                      ▼      
-                                              ┌───────────────────┐      ╭───────────╮
-                                              │                   │      │           │
-                                              │        422        │      │ Write row │
-                                              │                   │      │           │
-                                              │                   │      │           │
-                                              └───────────────────┘      ╰─────┬─────╯
-                                                                               │      
-                                                                               │      
-                                                                               │      
-                                                                               │      
-                                                                               ▼      
-                                                                         ┌───────────┐
-                                                                         │           │
-                                                                         │ 200 saved │
-                                                                         │           │
-                                                                         └───────────┘
+                ┌───────────┐
+                │           │
+                │ Edit form │
+                │           │
+                └─────┬─────┘
+                      │
+                      │
+                      │
+                      │
+                      ▼
+                ◇───────────◇
+                │           │
+        ┌───────┤   Dirty?  ├─────────────────────┐
+        │       │           │                     │
+        │       ◇───────────◇                     │
+       No                                        Yes
+        │                                         │
+        │                                         │
+        │                                         │
+        ▼                                         ▼
+┌───────────────┐                         ┌───────────────┐
+│               │                         │               │
+│    Stay put   │                         │ PUT /items/id │
+│               │                         │               │
+└───────────────┘                         └───────┬───────┘
+                                                  │
+                                                  │
+                                                  │
+                                                  │
+                                                  ▼
+                                          ◇───────────────◇
+                                          │               │
+                                   ┌──────┤  Authorized?  ├──────────────────┐
+                                   │      │               │                  │
+                                   │      ◇───────────────◇                  │
+                                  No                                        Yes
+                                   │                                         │
+                                   │                                         │
+                                   │                                         │
+                                   ▼                                         ▼
+                            ┌─────────────┐                           ◇─────────────◇
+                            │             │                           │             │
+                            │     403     │                     ┌─────┤ Valid body? ├─────┐
+                            │             │                     │     │             │     │
+                            └─────────────┘                     │     ◇─────────────◇     │
+                                                               No                        Yes
+                                                                │                         │
+                                                                │                         │
+                                                                │                         │
+                                                                │                         │
+                                                                ▼                         ▼
+                                                          ┌───────────┐             ╭───────────╮
+                                                          │           │             │           │
+                                                          │    422    │             │ Write row │
+                                                          │           │             │           │
+                                                          │           │             │           │
+                                                          └───────────┘             ╰─────┬─────╯
+                                                                                          │
+                                                                                          │
+                                                                                          │
+                                                                                          │
+                                                                                          ▼
+                                                                                    ┌───────────┐
+                                                                                    │           │
+                                                                                    │ 200 saved │
+                                                                                    │           │
+                                                                                    └───────────┘
 ```
 
 ### Pay
 
 The click leaves the client. Stock and the card are both server decisions, and only both passing creates the order.
+
+<img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> Mermaid
 
 ```mermaid
 graph TD
@@ -208,77 +222,85 @@ graph TD
   H --> I[Show confirmation]
 ```
 
+<picture>
+  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
+  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
+  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
+</picture>
+
 ```text
-                       ┌────────────────────┐                                                
-                       │                    │                                                
-                       │     Click pay      │                                                
-                       │                    │                                                
-                       └──────────┬─────────┘                                                
-                                  │                                                          
-                                  │                                                          
-                                  │                                                          
-                                  │                                                          
-                                  ▼                                                          
-                       ┌────────────────────┐                                                
-                       │                    │                                                
-                       │   POST /checkout   │                                                
-                       │                    │                                                
-                       └──────────┬─────────┘                                                
-                                  │                                                          
-                                  │                                                          
-                                  │                                                          
-                                  │                                                          
-                                  ▼                                                          
-                       ◇────────────────────◇                                                
-                       │                    │                                                
-        ┌──────────────┤     In stock?      ├───────────────────┐                            
-        │              │                    │                   │                            
-        │              ◇────────────────────◇                   │                            
-       No                                                      Yes                           
-        │                                                       │                            
-        │                                                       │                            
-        │                                                       │                            
-        ▼                                                       ▼                            
-┌───────────────┐                                       ◇───────────────◇                    
-│               │                                       │               │                    
-│ Show sold out │                                ┌──────┤ Card charged? ├─────────┐          
-│               │                                │      │               │         │          
-└───────────────┘                                │      ◇───────────────◇         │          
-                                                No                               Yes         
-                                                 │                                │          
-                                                 │                                │          
-                                                 │                                │          
-                                                 ▼                                ▼          
-                                  ┌─────────────────────────────┐       ┌───────────────────┐
-                                  │                             │       │                   │
-                                  │         Ask for card        │       │    Create order   │
-                                  │                             │       │                   │
-                                  └─────────────────────────────┘       └─────────┬─────────┘
-                                                                                  │          
-                                                                                  │          
-                                                                                  │          
-                                                                                  │          
-                                                                                  ▼          
-                                                                        ┌───────────────────┐
-                                                                        │                   │
-                                                                        │   Return receipt  │
-                                                                        │                   │
-                                                                        └─────────┬─────────┘
-                                                                                  │          
-                                                                                  │          
-                                                                                  │          
-                                                                                  │          
-                                                                                  ▼          
-                                                                        ┌───────────────────┐
-                                                                        │                   │
-                                                                        │ Show confirmation │
-                                                                        │                   │
-                                                                        └───────────────────┘
+                ┌────────────────┐
+                │                │
+                │   Click pay    │
+                │                │
+                └────────┬───────┘
+                         │
+                         │
+                         │
+                         │
+                         ▼
+                ┌────────────────┐
+                │                │
+                │ POST /checkout │
+                │                │
+                └────────┬───────┘
+                         │
+                         │
+                         │
+                         │
+                         ▼
+                ◇────────────────◇
+                │                │
+        ┌───────┤   In stock?    ├───────────────────────────┐
+        │       │                │                           │
+        │       ◇────────────────◇                           │
+       No                                                   Yes
+        │                                                    │
+        │                                                    │
+        │                                                    │
+        ▼                                                    ▼
+┌───────────────┐                                    ◇───────────────◇
+│               │                                    │               │
+│ Show sold out │                          ┌─────────┤ Card charged? ├─────────┐
+│               │                          │         │               │         │
+└───────────────┘                          │         ◇───────────────◇         │
+                                          No                                  Yes
+                                           │                                   │
+                                           │                                   │
+                                           │                                   │
+                                           ▼                                   ▼
+                                 ┌───────────────────┐               ┌───────────────────┐
+                                 │                   │               │                   │
+                                 │    Ask for card   │               │    Create order   │
+                                 │                   │               │                   │
+                                 └───────────────────┘               └─────────┬─────────┘
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               ▼
+                                                                     ┌───────────────────┐
+                                                                     │                   │
+                                                                     │   Return receipt  │
+                                                                     │                   │
+                                                                     └─────────┬─────────┘
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               ▼
+                                                                     ┌───────────────────┐
+                                                                     │                   │
+                                                                     │ Show confirmation │
+                                                                     │                   │
+                                                                     └───────────────────┘
 ```
 
 ### Load a list
 
 One request, three server answers, and a second question only on the success path.
+
+<img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> Mermaid
 
 ```mermaid
 graph TD
@@ -291,52 +313,58 @@ graph TD
   C -->|500| H[Show retry]
 ```
 
+<picture>
+  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
+  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
+  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
+</picture>
+
 ```text
-                    ┌───────────────┐                   
-                    │               │                   
-                    │   Open list   │                   
-                    │               │                   
-                    └───────┬───────┘                   
-                            │                           
-                            │                           
-                            │                           
-                            │                           
-                            ▼                           
-                    ┌───────────────┐                   
-                    │               │                   
-                    │   GET /items  │                   
-                    │               │                   
-                    └───────┬───────┘                   
-                            │                           
-                            │                           
-                            │                           
-                            │                           
-                            ▼                           
-                    ◇───────────────◇                   
-                    │               │                   
-       ┌────────────┤     Status    ├────────────┐      
-       │            │               │            │      
-       │            ◇───────┬───────◇            │      
-      200                  401                  500     
-       │                    │                    │      
-       │                    │                    │      
-       │                    │                    │      
-       ▼                    ▼                    ▼      
-◇─────────────◇     ┌───────────────┐     ┌────────────┐
-│             │     │               │     │            │
-│  Any rows?  ├──┐  │ Send to login │     │ Show retry │
-│             │  │  │               │     │            │
-◇──────┬──────◇  │  └───────────────┘     └────────────┘
-      Yes        │                                      
-       │         │                                      
-       │         └─────────No                           
-       │                    │                           
-       ▼                    ▼                           
-┌─────────────┐     ┌───────────────┐                   
-│             │     │               │                   
-│ Render rows │     │   Show empty  │                   
-│             │     │               │                   
-└─────────────┘     └───────────────┘
+                                            ┌────────────┐
+                                            │            │
+                                            │ Open list  │
+                                            │            │
+                                            └──────┬─────┘
+                                                   │
+                                                   │
+                                                   │
+                                                   │
+                                                   ▼
+                                            ┌────────────┐
+                                            │            │
+                                            │ GET /items │
+                                            │            │
+                                            └──────┬─────┘
+                                                   │
+                                                   │
+                                                   │
+                                                   │
+                                                   ▼
+                                            ◇────────────◇
+                                            │            │
+                      ┌─────────────────────┤   Status   ├───────┬─────────────────────┐
+                      │                     │            │       │                     │
+                      │                     ◇────────────◇       │                     │
+                     200                                        401                   500
+                      │                                          │                     │
+                      │                                          │                     │
+                      │                                          │                     │
+                      ▼                                          ▼                     ▼
+              ◇───────────────◇                          ┌───────────────┐     ┌───────────────┐
+              │               │                          │               │     │               │
+       ┌──────┤   Any rows?   ├──────┐                   │ Send to login │     │   Show retry  │
+       │      │               │      │                   │               │     │               │
+       │      ◇───────────────◇      │                   └───────────────┘     └───────────────┘
+      Yes                           No
+       │                             │
+       │                             │
+       │                             │
+       ▼                             ▼
+┌─────────────┐               ┌─────────────┐
+│             │               │             │
+│ Render rows │               │  Show empty │
+│             │               │             │
+└─────────────┘               └─────────────┘
 ```
 
 ## Usage
@@ -380,11 +408,7 @@ beautiful-mermaid's ASCII engine is a TypeScript port of [mermaid-ascii](https:/
 
 We kept flowcharts. A flowchart is the diagram that helps someone check a decision, so that is the surface we maintain. The sequence, class, ER, state, and XY renderers from upstream stayed behind.
 
-Two flowchart bugs from that port are fixed here.
-
-A node mentioned before it was given a shape used to keep its id as the label. `A --> B` followed later by `B[Check token]` now draws **Check token**.
-
-The picture is plain text. The upstream renderer would color the boxes for a terminal, and those color codes would show up inside the markdown. Chat gets the box drawing on its own.
+The flowchart path has moved on from that port. Where items sit, a few bugs, and other stylistic choices have all been reworked.
 
 ## License
 
