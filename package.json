@@ -1,0 +1,39 @@
+{
+  "name": "flowchart-md",
+  "version": "1.0.0",
+  "description": "Print flowcharts as markdown an agent can show in chat.",
+  "type": "module",
+  "bin": {
+    "flowchart-md": "./build/index.js"
+  },
+  "main": "./build/index.js",
+  "files": [
+    "build",
+    "README.md",
+    "src/render/LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "flowchart",
+    "markdown",
+    "mcp",
+    "ascii"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.6.5"
+  }
+}
