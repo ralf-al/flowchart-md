@@ -99,8 +99,9 @@ function drawBoxWithGridDimensions(node: AsciiNode, graph: AsciiGraph): Canvas {
   // Center the multi-line display label inside the box
   const label = node.displayLabel
   const lines = splitLines(label)
-  const textCenterY = from.y + Math.floor(h / 2)
-  const startY = textCenterY - Math.floor((lines.length - 1) / 2)
+  // Sit the text on the middle row. A block with an even number of lines
+  // hangs one row high of that middle, so it does not sag below a one-line neighbor.
+  const startY = Math.max(1, Math.floor(h / 2 - (lines.length - 1) / 2))
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!

@@ -8,6 +8,8 @@
 
 <p align="center"><b>Visualize logic with agents.</b><br>Ask how something works. The flowchart shows up in the chat.</p>
 
+<p align="center">The agent writes in <img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> <a href="https://mermaid.js.org/">Mermaid</a>, the syntax it already knows.</p>
+
 <p align="center">
   <img src="https://img.shields.io/badge/MCP-server-1b1b19?style=flat-square" alt="MCP server">
 </p>
@@ -66,10 +68,6 @@
 
 Seeing the system makes it easier to understand, and easier to change. You and the agent look at the same picture: where a request starts, what it checks, and where it ends. Adjust the design, ask again, and the next picture is the next version.
 
-<h2 align="center">🚧</h2>
-
-<p align="center">npm publish is pending. The install below runs from GitHub with npx, so it does not need an npm release.</p>
-
 ## Install
 
 ### Claude Code
@@ -107,8 +105,6 @@ npx -y github:ralf-al/flowchart-md
 
 ## Examples
 
-Written in <img src="https://mermaid.js.org/favicon.svg" height="14" alt="" /> [Mermaid](https://mermaid.js.org/), the syntax agents already know.
-
 ### Save
 
 The client only sends a change. The server then checks who is calling, then whether the body is valid, then writes.
@@ -128,11 +124,7 @@ graph TD
   I --> J[200 saved]
 ```
 
-<picture>
-  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
-  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
-  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
-</picture>
+**flowchart md**
 
 ```text
                 ┌───────────┐
@@ -222,11 +214,7 @@ graph TD
   H --> I[Show confirmation]
 ```
 
-<picture>
-  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
-  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
-  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
-</picture>
+**flowchart md**
 
 ```text
                 ┌────────────────┐
@@ -313,11 +301,7 @@ graph TD
   C -->|500| H[Show retry]
 ```
 
-<picture>
-  <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
-  <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
-  <img src="./github/logo-light.png" alt="flowchart-md" width="64" height="15" />
-</picture>
+**flowchart md**
 
 ```text
                                             ┌────────────┐
