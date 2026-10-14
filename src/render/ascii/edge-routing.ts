@@ -165,6 +165,23 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   const [preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir] =
     determineStartAndEndDir(edge, effectiveDir)
 
+  // A node with one next step leaves through the bottom (top-to-bottom) or
+  // the right (left-to-right), even when that step sits a little to the side.
+  // A branch with several answers keeps the side exits.
+  if (isOnlyDownstreamEdge(graph, edge, effectiveDir)) {
+    const startDir = effectiveDir === 'TD' ? Down : Right
+    const endDir = effectiveDir === 'TD' ? Up : Left
+    const from = gridCoordDirection(edge.from.gridCoord!, startDir)
+    const to = gridCoordDirection(edge.to.gridCoord!, endDir)
+    const flowPath = getPath(graph.grid, from, to)
+    if (flowPath !== null) {
+      edge.startDir = startDir
+      edge.endDir = endDir
+      edge.path = mergePath(flowPath)
+      return
+    }
+  }
+
   // Try preferred path
   const prefFrom = gridCoordDirection(edge.from.gridCoord!, preferredDir)
   const prefTo = gridCoordDirection(edge.to.gridCoord!, preferredOppositeDir)
@@ -215,6 +232,26 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   edge.startDir = preferredDir
   edge.endDir = preferredOppositeDir
   edge.path = [prefFrom, prefTo]
+}
+
+/** True when this edge is the source node's only step further along the flow. */
+function isOnlyDownstreamEdge(graph: AsciiGraph, edge: AsciiEdge, flow: string): boolean {
+  const from = edge.from.gridCoord
+  const to = edge.to.gridCoord
+  if (!from || !to) return false
+
+  const isDownstream = flow === 'TD' ? to.y > from.y : to.x > from.x
+  if (!isDownstream) return false
+
+  let downstream = 0
+  for (const other of graph.edges) {
+    if (other.from !== edge.from || !other.to.gridCoord) continue
+    const further = flow === 'TD'
+      ? other.to.gridCoord.y > from.y
+      : other.to.gridCoord.x > from.x
+    if (further) downstream++
+  }
+  return downstream === 1
 }
 
 /**

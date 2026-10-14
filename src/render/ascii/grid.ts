@@ -472,11 +472,8 @@ export function createMapping(graph: AsciiGraph): void {
     }
   }
 
-  // Place child nodes level by level
-  // Use subgraph direction only when both parent and child are in the same subgraph
-  // Multi-pass: iterate until all nodes are placed (handles non-topological node order)
-  // Note: when shouldSeparate, externalRootNodes + subgraphRootNodes = rootNodes
-  //       otherwise, externalRootNodes = rootNodes and subgraphRootNodes is empty
+  // Place child nodes level by level, then center each parent over the
+  // children it splits into so a decision sits between its answers.
   let placedCount = externalRootNodes.length + subgraphRootNodes.length
   while (placedCount < graph.nodes.length) {
     const prevCount = placedCount
@@ -524,6 +521,8 @@ export function createMapping(graph: AsciiGraph): void {
     if (placedCount === prevCount) break
   }
 
+  centerParentsOverChildren(graph)
+
   // Compute column widths and row heights
   for (const node of graph.nodes) {
     setColumnWidth(graph, node)
@@ -561,6 +560,122 @@ export function createMapping(graph: AsciiGraph): void {
   setRoleCanvasSizeToGrid(graph.roleCanvas, graph.columnWidth, graph.rowHeight)
   calculateSubgraphBoundingBoxes(graph)
   offsetDrawingForSubgraphs(graph)
+}
+
+/**
+ * Shift each node so a branch sits between its answers.
+ * Walks from the bottom of the graph upward. A node with several children
+ * on the next row moves to their midpoint. A node with one child lines up
+ * with that child when it is the child's only parent, so a straight chain
+ * stays straight. Edges that run back up the graph are ignored.
+ */
+function centerParentsOverChildren(graph: AsciiGraph): void {
+  const flow: 'TD' | 'LR' = graph.config.graphDirection === 'LR' ? 'LR' : 'TD'
+  const levelOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.x : node.gridCoord!.y
+  const crossOf = (node: AsciiNode) => flow === 'LR' ? node.gridCoord!.y : node.gridCoord!.x
+
+  const placed = graph.nodes.filter(node => node.gridCoord)
+  const levels = [...new Set(placed.map(levelOf))].sort((a, b) => b - a)
+
+  for (const level of levels) {
+    const row = placed.filter(node => levelOf(node) === level)
+    const desired = new Map<AsciiNode, number>()
+
+    for (const node of row) {
+      const children = getChildren(graph, node).filter(child => child.gridCoord && levelOf(child) > level)
+      if (children.length === 0) {
+        desired.set(node, crossOf(node))
+        continue
+      }
+
+      const nextLevel = Math.min(...children.map(levelOf))
+      const immediate = children.filter(child => levelOf(child) === nextLevel)
+      const soleParent = immediate.length === 1 && countForwardParents(graph, immediate[0]!, levelOf) === 1
+      const alignToChildren = immediate.length > 1 || soleParent
+      if (!alignToChildren) {
+        desired.set(node, crossOf(node))
+        continue
+      }
+
+      const average = immediate.reduce((sum, child) => sum + crossOf(child), 0) / immediate.length
+      desired.set(node, Math.round(average))
+    }
+
+    const ordered = [...row].sort((a, b) => crossOf(a) - crossOf(b) || a.index - b.index)
+    let minCross = Number.NEGATIVE_INFINITY
+    for (const node of ordered) {
+      const wanted = desired.get(node) ?? crossOf(node)
+      const candidates = [wanted, crossOf(node), Math.max(wanted, minCross)]
+      let placedCross = Math.max(wanted, minCross)
+      for (const candidate of candidates) {
+        const cross = Math.max(candidate, minCross)
+        const origin = flow === 'LR'
+          ? { x: level, y: cross }
+          : { x: cross, y: level }
+        if (reservationFree(graph, origin, node)) {
+          placedCross = cross
+          break
+        }
+      }
+      const origin: GridCoord = flow === 'LR'
+        ? { x: level, y: placedCross }
+        : { x: placedCross, y: level }
+      let guard = 0
+      while (!reservationFree(graph, origin, node) && guard < 20) {
+        if (flow === 'LR') origin.y += 4
+        else origin.x += 4
+        guard++
+      }
+      relocateNode(graph, node, origin)
+      minCross = crossOf(node) + 4
+    }
+  }
+}
+
+/** Incoming edges from an earlier row. A merge has more than one. */
+function countForwardParents(
+  graph: AsciiGraph,
+  node: AsciiNode,
+  levelOf: (node: AsciiNode) => number,
+): number {
+  const level = levelOf(node)
+  let count = 0
+  for (const edge of graph.edges) {
+    if (edge.to === node && edge.from.gridCoord && levelOf(edge.from) < level) count++
+  }
+  return count
+}
+
+function reservationFree(graph: AsciiGraph, origin: GridCoord, node: AsciiNode): boolean {
+  for (let dx = 0; dx < 3; dx++) {
+    for (let dy = 0; dy < 3; dy++) {
+      const occupant = graph.grid.get(gridKey({ x: origin.x + dx, y: origin.y + dy }))
+      if (occupant && occupant !== node) return false
+    }
+  }
+  return true
+}
+
+/** Move a node's 3x3 reservation. The grid is what edge routing treats as occupied. */
+function relocateNode(graph: AsciiGraph, node: AsciiNode, origin: GridCoord): void {
+  const current = node.gridCoord
+  if (current && current.x === origin.x && current.y === origin.y) return
+
+  if (current) {
+    for (let dx = 0; dx < 3; dx++) {
+      for (let dy = 0; dy < 3; dy++) {
+        const key = gridKey({ x: current.x + dx, y: current.y + dy })
+        if (graph.grid.get(key) === node) graph.grid.delete(key)
+      }
+    }
+  }
+
+  for (let dx = 0; dx < 3; dx++) {
+    for (let dy = 0; dy < 3; dy++) {
+      graph.grid.set(gridKey({ x: origin.x + dx, y: origin.y + dy }), node)
+    }
+  }
+  node.gridCoord = origin
 }
 
 // ============================================================================
