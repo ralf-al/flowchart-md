@@ -387,7 +387,7 @@ export function drawArrow(
   }
 
   const labelCanvas = drawArrowLabel(graph, edge)
-  const [pathCanvas, linesDrawn, lineDirs] = drawPath(graph, edge.path, edge.style)
+  const [pathCanvas, linesDrawn, lineDirs] = drawPath(graph, edge.path, edge.from, edge.style)
   const boxStartCanvas = drawBoxStart(graph, edge.path, linesDrawn[0]!, edge.from.shape)
 
   // Draw end arrowhead only if hasArrowEnd is true (default behavior)
@@ -449,9 +449,44 @@ function reverseDirection(dir: Direction): Direction {
  * Draw the path lines for an edge.
  * Returns the canvas, the coordinates drawn for each segment, and the direction of each segment.
  */
+/** Outer border of a node box in drawing coordinates. The box covers two grid columns and two grid rows. */
+function boxBounds(
+  graph: AsciiGraph,
+  node: AsciiNode,
+): { left: number; right: number; top: number; bottom: number } | null {
+  const gc = node.gridCoord
+  const base = node.drawingCoord
+  if (!gc || !base) return null
+  let w = 0
+  let h = 0
+  for (let i = 0; i < 2; i++) {
+    w += graph.columnWidth.get(gc.x + i) ?? 0
+    h += graph.rowHeight.get(gc.y + i) ?? 0
+  }
+  return { left: base.x, right: base.x + w, top: base.y, bottom: base.y + h }
+}
+
+/**
+ * Move the start of an exit segment onto the box border.
+ * A wide gap column otherwise leaves the line floating short of the box.
+ */
+function snapToBoxEdge(
+  prev: DrawingCoord,
+  next: DrawingCoord,
+  dir: Direction,
+  bounds: { left: number; right: number; top: number; bottom: number },
+): DrawingCoord {
+  if (dirEquals(dir, Right) && bounds.right < next.x) return { x: bounds.right, y: prev.y }
+  if (dirEquals(dir, Left) && bounds.left > next.x) return { x: bounds.left, y: prev.y }
+  if (dirEquals(dir, Down) && bounds.bottom < next.y) return { x: prev.x, y: bounds.bottom }
+  if (dirEquals(dir, Up) && bounds.top > next.y) return { x: prev.x, y: bounds.top }
+  return prev
+}
+
 function drawPath(
   graph: AsciiGraph,
   path: GridCoord[],
+  source: AsciiNode | undefined,
   style: AsciiEdgeStyle = 'solid',
 ): [Canvas, DrawingCoord[][], Direction[]] {
   const canvas = copyCanvas(graph.canvas)
@@ -461,8 +496,15 @@ function drawPath(
 
   for (let i = 1; i < path.length; i++) {
     const nextCoord = path[i]!
-    const prevDC = gridToDrawingCoord(graph, previousCoord)
+    let prevDC = gridToDrawingCoord(graph, previousCoord)
     const nextDC = gridToDrawingCoord(graph, nextCoord)
+
+    if (i === 1 && source) {
+      const bounds = boxBounds(graph, source)
+      if (bounds) {
+        prevDC = snapToBoxEdge(prevDC, nextDC, determineDirection(previousCoord, nextCoord), bounds)
+      }
+    }
 
     if (drawingCoordEquals(prevDC, nextDC)) {
       previousCoord = nextCoord
@@ -608,10 +650,88 @@ function drawCorners(graph: AsciiGraph, path: GridCoord[]): Canvas {
   return canvas
 }
 
+/** Branch labels that should share one row (or column) under their decision. */
+const branchLabelAt = new WeakMap<AsciiEdge, DrawingCoord>()
+
+/** Where a label would land on its chosen segment, including the vertical bias for downward edges. */
+function labelPlacement(graph: AsciiGraph, edge: AsciiEdge): DrawingCoord | null {
+  if (edge.labelLine.length < 2) return null
+  const line = lineToDrawing(graph, edge.labelLine)
+  if (line.length < 2) return null
+
+  const minX = Math.min(line[0]!.x, line[1]!.x)
+  const maxX = Math.max(line[0]!.x, line[1]!.x)
+  const minY = Math.min(line[0]!.y, line[1]!.y)
+  const maxY = Math.max(line[0]!.y, line[1]!.y)
+  const middleX = minX + Math.floor((maxX - minX) / 2)
+  let middleY = minY + Math.floor((maxY - minY) / 2)
+
+  let isUpwardEdge: boolean | undefined
+  if (edge.path.length >= 2) {
+    const startY = edge.path[0]!.y
+    const endY = edge.path[edge.path.length - 1]!.y
+    if (endY < startY) isUpwardEdge = true
+    else if (endY > startY) isUpwardEdge = false
+  }
+
+  if (isUpwardEdge !== undefined && minX === maxX) {
+    const offset = Math.max(1, Math.floor((maxY - minY) / 4))
+    middleY = isUpwardEdge ? middleY + offset : middleY - offset
+  }
+
+  return { x: middleX, y: middleY }
+}
+
+/**
+ * Put labels that leave the same decision on one row, just under the box.
+ * Side exits otherwise sit on the horizontal arm while the middle label sits lower on the stem.
+ * Labels already far down a detour stay where they are.
+ */
+function alignBranchLabels(graph: AsciiGraph): void {
+  if (graph.config.graphDirection !== 'TD') return
+
+  const groups = new Map<AsciiNode, AsciiEdge[]>()
+  for (const edge of graph.edges) {
+    if (edge.text.length === 0) continue
+    const list = groups.get(edge.from) ?? []
+    list.push(edge)
+    groups.set(edge.from, list)
+  }
+
+  for (const [source, edges] of groups) {
+    if (edges.length < 2) continue
+    const bounds = boxBounds(graph, source)
+    if (!bounds) continue
+    const bandBottom = bounds.bottom + 2
+    const alignedY = bounds.bottom + 1
+    for (const edge of edges) {
+      const at = labelPlacement(graph, edge)
+      if (!at || at.y < bounds.top || at.y > bandBottom) continue
+      branchLabelAt.set(edge, { x: at.x, y: alignedY })
+    }
+  }
+}
+
+/** Draw a label centered on a point. Multi-line labels stack around that row. */
+function drawLabelAt(canvas: Canvas, at: DrawingCoord, label: string): void {
+  const lines = splitLines(label)
+  const startY = at.y - Math.floor((lines.length - 1) / 2)
+  for (let i = 0; i < lines.length; i++) {
+    const lineText = lines[i]!
+    drawText(canvas, { x: at.x - Math.floor(lineText.length / 2), y: startY + i }, lineText)
+  }
+}
+
 /** Draw edge label text centered on the widest path segment. */
 function drawArrowLabel(graph: AsciiGraph, edge: AsciiEdge): Canvas {
   const canvas = copyCanvas(graph.canvas)
   if (edge.text.length === 0) return canvas
+
+  const aligned = branchLabelAt.get(edge)
+  if (aligned) {
+    drawLabelAt(canvas, aligned, edge.text)
+    return canvas
+  }
 
   const drawingLine = lineToDrawing(graph, edge.labelLine)
 
@@ -1277,6 +1397,8 @@ export function drawGraph(graph: AsciiGraph): Canvas {
   }
 
   // Collect all edge drawing layers
+  alignBranchLabels(graph)
+
   const lineCanvases: Canvas[] = []
   const cornerCanvases: Canvas[] = []
   const arrowHeadEndCanvases: Canvas[] = []

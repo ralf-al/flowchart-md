@@ -501,8 +501,11 @@ export function createMapping(graph: AsciiGraph): void {
           // This keeps children aligned with parent when direction changes
           highestPosition = edgeDir === 'LR' ? gc.y : gc.x
         } else {
-          // Same direction: use level tracker
-          highestPosition = highestPositionPerLevel[childLevel]!
+          // Keep a step under its parent when the row is still empty there.
+          // Otherwise a right-hand branch snaps back to the left edge.
+          const parentCross = edgeDir === 'LR' ? gc.y : gc.x
+          const levelCursor = highestPositionPerLevel[childLevel]!
+          highestPosition = Math.max(levelCursor, parentCross)
         }
 
         const requested: GridCoord = edgeDir === 'LR'
