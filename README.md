@@ -1,29 +1,82 @@
-# flowchart-md
+<p align="center">
+  <picture>
+    <source srcset="./github/logo-dark.png" media="(prefers-color-scheme: dark)" />
+    <source srcset="./github/logo-light.png" media="(prefers-color-scheme: light)" />
+    <img src="./github/logo-light.png" alt="flowchart-md" width="529" />
+  </picture>
+</p>
 
-**Print a flowchart as markdown.**
+<p align="center"><b>Print a flowchart as markdown.</b><br>An agent shows the branch in chat, in the markdown it already writes.</p>
 
-Agents already write markdown well. This puts the picture in that markdown, so a branch shows up in chat.
-
-![MCP server](https://img.shields.io/badge/MCP-server-1b1b19?style=flat-square)![Node 24 or later](https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white)![Renderer is MIT](https://img.shields.io/badge/renderer-MIT-1b1b19?style=flat-square)
-
-[Quick start](#quick-start) · [Samples](#samples) · [Why](#why) · [Credit](#credit) · [Usage](#usage) · [How it works](#how-it-works) · [Limits](#limits)
+<p align="center">
+  <img src="https://img.shields.io/badge/MCP-server-1b1b19?style=flat-square" alt="MCP server">
+  <img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later">
+  <img src="https://img.shields.io/badge/renderer-MIT-1b1b19?style=flat-square" alt="Renderer is MIT">
+</p>
 
 ```text
- ______ _                   _                _          __  __ _____
-|  ____| |                 | |              | |        |  \/  |  __ \
-| |__  | | _____      _____| |__   __ _ _ __| |_ ______| \  / | |  | |
-|  __| | |/ _ \ \ /\ / / __| '_ \ / _` | '__| __|______| |\/| | |  | |
-| |    | | (_) \ V  V / (__| | | | (_| | |  | |_       | |  | | |__| |
-|_|    |_|\___/ \_/\_/ \___|_| |_|\__,_|_|   \__|      |_|  |_|_____/
+┌─────────────────┐
+│                 │
+│   Form submit   │
+│                 │
+└────────┬────────┘
+         │
+         │
+         │
+         │
+         ▼
+◇─────────────────◇
+│                 │
+│  Fields valid?  ├────────────┐
+│                 │            │
+◇────────┬────────◇           Yes
+         │                     │
+        No                     │
+         │                     │
+         │                     │
+         ▼                     ▼
+┌─────────────────┐     ┌─────────────┐
+│                 │     │             │
+│   Show errors   │     │ POST /login │
+│                 │     │             │
+└─────────────────┘     └──────┬──────┘
+                               │
+                               │
+                               │
+                               │
+                               │
+◇─────────────────◇            │
+│                 │            │
+│ Credentials ok? ├◄───────────┤
+│                 │            │
+◇────────┬────────◇           Yes
+         │                     │
+        No                     │
+         │                     │
+         │                     │
+         ▼                     ▼
+┌─────────────────┐     ┌─────────────┐
+│                 │     │             │
+│       401       │     │ Set session │
+│                 │     │             │
+└─────────────────┘     └──────┬──────┘
+                               │
+                               │
+                               │
+                               │
+                               │
+┌─────────────────┐            │
+│                 │            │
+│  Redirect home  │◄───────────┘
+│                 │
+└─────────────────┘
 ```
 
----
+<p align="center"><sub>A sign-in, as it shows up in chat. The form checks the fields. The server checks the credentials.</sub></p>
 
-Ask an agent to explain a process and it will often write the condition in a sentence. The sentence can be right and still be hard to audit. flowchart-md gives the agent a flowchart in the markdown it already writes well: a step is a box, a question is a diamond, and each answer is a labeled arrow. The picture comes back as a markdown code block, so it shows up in chat.
+## Install
 
-## Quick start
-
-Add this to the MCP client. In Cursor, that is `.cursor/mcp.json`:
+Add this to the MCP client. In Cursor, that is `.cursor/mcp.json`.
 
 ```json
 {
@@ -38,129 +91,282 @@ Add this to the MCP client. In Cursor, that is `.cursor/mcp.json`:
 
 Reload the server, then ask for a flowchart of the logic you want to check. The tool is `render-flowchart`. It returns a markdown code block. The agent pastes that block into the reply unchanged.
 
-Node 24 or later. The server speaks MCP over stdio.
+Node 24 or later.
 
-To work on this repo:
+## Examples
 
-```sh
-npm install
-npm run build
-```
+### Save
 
-## Samples
-
-Each block below is the tool's output for that source.
-
-### A decision
+The client only sends a change. The server then checks who is calling, then whether the body is valid, then writes.
 
 ```mermaid
 graph TD
-  A[Start] --> B{Logged in?}
-  B -->|Yes| C[Show home]
-  B -->|No| D[Show login]
-```
-
-```text
-┌────────────┐
-│            │
-│   Start    │
-│            │
-└──────┬─────┘
-       │
-       │
-       │
-       │
-       ▼
-◇────────────◇
-│            │
-│ Logged in? ├────────────┐
-│            │            │
-◇──────┬─────◇           No
-       │                  │
-      Yes                 │
-       │                  │
-       │                  │
-       ▼                  ▼
-┌────────────┐     ┌────────────┐
-│            │     │            │
-│ Show home  │     │ Show login │
-│            │     │            │
-└────────────┘     └────────────┘
-```
-
-### A retry
-
-```mermaid
-graph TD
-  S[Call API] --> C{Status}
-  C -->|200| OK[Return data]
-  C -->|500| N{Retries left?}
-  N -->|Yes| W[Wait] --> S
-  N -->|No| F[Fail]
+  A[Edit form] --> B{Dirty?}
+  B -->|No| C[Stay put]
+  B -->|Yes| D[PUT /items/id]
+  D --> E{Authorized?}
+  E -->|No| F[403]
+  E -->|Yes| G{Valid body?}
+  G -->|No| H[422]
+  G -->|Yes| I[(Write row)]
+  I --> J[200 saved]
 ```
 
 ```text
 ┌─────────────┐
 │             │
-│   Call API  │◄─┐
-│             │  │
-└──────┬──────┘  │
-       │         │
-       │         │
-       │         │
-       │         │
-       ▼         │
-◇─────────────◇  │
-│             │  │
-│    Status   ├──┼──────────┐
-│             │  │          │
-◇──────┬──────◇  │         500
-       │         │          │
-      200        │          │
-       │         │          │
-       │         │          │
-       ▼         │          ▼
-┌─────────────┐  │  ◇───────────────◇
-│             │  │  │               │
-│ Return data │  ├──┤ Retries left? │
+│  Edit form  │
+│             │
+└──────┬──────┘
+       │
+       │
+       │
+       │
+       ▼
+◇─────────────◇
+│             │
+│    Dirty?   ├─────────────┐
+│             │             │
+◇──────┬──────◇            Yes
+       │                    │
+      No                    │
+       │                    │
+       │                    │
+       ▼                    ▼
+┌─────────────┐     ┌───────────────┐
+│             │     │               │
+│   Stay put  │     │ PUT /items/id │
+│             │     │               │
+└─────────────┘     └───────┬───────┘
+                            │
+                            │
+                            │
+                            │
+                            │
+◇─────────────◇             │
+│             │             │
+│ Authorized? ├◄────────────┤
+│             │             │
+◇──────┬──────◇            Yes
+       │                    │
+      No                    │
+       │                    │
+       │                    │
+       ▼                    ▼
+┌─────────────┐     ◇───────────────◇
+│             │     │               │
+│     403     │  ┌──┤  Valid body?  │
 │             │  │  │               │
 └─────────────┘  │  ◇───────┬───────◇
                  │          │
-                 │         No
-      Yes────────┤          │
-       │         │          │
-       ▼         │          ▼
-┌─────────────┐  │  ┌───────────────┐
-│             │  │  │               │
-│     Wait    ├──┘  │      Fail     │
+                 │         Yes
+       ┌─────────┘          │
+      No                    │
+       │                    │
+       ▼                    ▼
+┌─────────────┐     ╭───────────────╮
+│             │     │               │
+│     422     │     │   Write row   │
+│             │     │               │
+│             │     │               │
+└─────────────┘     ╰───────┬───────╯
+                            │
+                            │
+                            │
+                            │
+                            │
+┌─────────────┐             │
+│             │             │
+│  200 saved  │◄────────────┘
+│             │
+└─────────────┘
+```
+
+### Pay
+
+The click leaves the client. Stock and the card are both server decisions, and only both passing creates the order.
+
+```mermaid
+graph TD
+  A[Click pay] --> B[POST /checkout]
+  B --> C{In stock?}
+  C -->|No| D[Show sold out]
+  C -->|Yes| E{Card charged?}
+  E -->|No| F[Ask for card]
+  E -->|Yes| G[Create order]
+  G --> H[Return receipt]
+  H --> I[Show confirmation]
+```
+
+```text
+┌───────────────────┐
+│                   │
+│     Click pay     │
+│                   │
+└─────────┬─────────┘
+          │
+          │
+          │
+          │
+          ▼
+┌───────────────────┐
+│                   │
+│   POST /checkout  │
+│                   │
+└─────────┬─────────┘
+          │
+          │
+          │
+          │
+          ▼
+◇───────────────────◇
+│                   │
+│     In stock?     ├─────────────┐
+│                   │             │
+◇─────────┬─────────◇            Yes
+          │                       │
+         No                       │
+          │                       │
+          │                       │
+          ▼                       ▼
+┌───────────────────┐     ◇───────────────◇
+│                   │     │               │
+│   Show sold out   │  ┌──┤ Card charged? │
+│                   │  │  │               │
+└───────────────────┘  │  ◇───────┬───────◇
+                       │          │
+                       │         Yes
+         No────────────┘          │
+          │                       │
+          ▼                       ▼
+┌───────────────────┐     ┌───────────────┐
+│                   │     │               │
+│    Ask for card   │     │  Create order │
+│                   │     │               │
+└───────────────────┘     └───────┬───────┘
+                                  │
+                                  │
+                                  │
+                                  │
+                                  │
+┌───────────────────┐             │
+│                   │             │
+│   Return receipt  │◄────────────┘
+│                   │
+└─────────┬─────────┘
+          │
+          │
+          │
+          │
+          ▼
+┌───────────────────┐
+│                   │
+│ Show confirmation │
+│                   │
+└───────────────────┘
+```
+
+### Load a list
+
+One request, three server answers, and a second question only on the success path.
+
+```mermaid
+graph TD
+  A[Open list] --> B[GET /items]
+  B --> C{Status}
+  C -->|200| D{Any rows?}
+  D -->|Yes| E[Render rows]
+  D -->|No| F[Show empty]
+  C -->|401| G[Send to login]
+  C -->|500| H[Show retry]
+```
+
+```text
+┌─────────────┐
+│             │
+│  Open list  │
+│             │
+└──────┬──────┘
+       │
+       │
+       │
+       │
+       ▼
+┌─────────────┐
+│             │
+│  GET /items │
+│             │
+└──────┬──────┘
+       │
+       │
+       │
+       │
+       ▼
+◇─────────────◇
+│             │
+│    Status   ├─────┬───────┐
+│             │     │       │
+◇──────┬──────◇     └──────401───────────────────┐
+       │                    │                    │
+      200                   │                   500
+       │                    │                    │
+       │                    │                    │
+       ▼                    ▼                    ▼
+◇─────────────◇     ┌───────────────┐     ┌────────────┐
+│             │     │               │     │            │
+│  Any rows?  ├──┐  │ Send to login │     │ Show retry │
+│             │  │  │               │     │            │
+◇──────┬──────◇  │  └───────────────┘     └────────────┘
+       │         │
+      Yes        │
+       │         └─────────No
+       │                    │
+       ▼                    ▼
+┌─────────────┐     ┌───────────────┐
+│             │     │               │
+│ Render rows │     │   Show empty  │
 │             │     │               │
 └─────────────┘     └───────────────┘
 ```
 
-The `Yes` arrow from `Retries left?` runs back to `Call API`. The `No` arrow ends at `Fail`. That loop is the thing a paragraph tends to blur.
-
-### A pipeline
-
-```mermaid
-graph LR
-  A[Lint] --> B[Test] --> C[Build] --> D[Deploy]
-```
-
-```text
-┌──────┐     ┌──────┐     ┌───────┐     ┌────────┐
-│      │     │      │     │       │     │        │
-│ Lint ├────►│ Test ├────►│ Build ├────►│ Deploy │
-│      │     │      │     │       │     │        │
-└──────┘     └──────┘     └───────┘     └────────┘
-```
-
-`graph TD` fits a process with questions. `graph LR` fits a straight pipeline.
-
 ## Why
 
-Conditional logic is where an explanation goes wrong quietly. "If the call fails and retries are left, wait and try again, otherwise fail" is easy to nod at and easy to swap. Drawn out, the `200` path, the retry path, and the give-up path are three different arrows. You can see which question they leave and which box they enter.
+Conditional logic is where an explanation goes wrong quietly. "If the call fails and retries are left, wait and try again, otherwise fail" is easy to nod at and easy to swap. Drawn out, each answer is its own arrow. You can see which question it leaves and which box it enters.
 
-That is the use. An agent reaches for this when it is walking a user through a decision: a login check, a payment branch, an approval, a retry, a rollback. The diagram is there so the user can verify the condition.
+That is the use. An agent reaches for this when it is walking a user through a request: a form check, an auth check, a stock check, a status code. The diagram is there so the user can verify the condition.
+
+## Usage
+
+`render-flowchart` takes one argument, `mermaid`, and returns `markdown`.
+
+```text
+graph TD
+  A[Form submit] --> B{Fields valid?}
+  B -->|No| C[Show errors]
+  B -->|Yes| D[POST /login]
+```
+
+Shapes the parser draws:
+
+| Write            | Meaning          |
+| ---------------- | ---------------- |
+| `A[Step]`        | A step           |
+| `B{Question?}`   | A decision       |
+| `C(Note)`        | A rounded step   |
+| `D([Start])`     | A start or end   |
+| `E[(Database)]`  | A cylinder       |
+| `A --> B`        | An arrow         |
+| `B -->\|Yes\| C` | A labeled branch |
+
+`graph` and `flowchart` both work, with direction `TD`, `TB`, `LR`, `BT`, or `RL`. Subgraphs, dotted edges (`-.->`), and thick edges (`==>`) work too. Keep labels to a few words so the boxes stay readable.
+
+The returned markdown is already a fenced code block. Paste it into the reply as it is.
+
+## Limits
+
+The tool accepts `graph` and `flowchart` only. Anything else is an error, including sequence, class, state, ER, and XY charts.
+
+The picture is plain text. It needs a monospace font, which a markdown code block provides. A graph with many crossing loops can get crowded. A labeled arrow that leaves the side of a node can start a short gap away from the box. That comes from the grid layout we inherited. Short labels and a top-to-bottom direction avoid most of it.
 
 ## Credit
 
@@ -176,39 +382,8 @@ A node mentioned before it was given a shape used to keep its id as the label. `
 
 The picture is plain text. The upstream renderer would color the boxes for a terminal, and those color codes would show up inside the markdown. Chat gets the box drawing on its own.
 
-## Usage
+## License
 
-`render-flowchart` takes one argument, `mermaid`, and returns `markdown`.
+flowchart-md is [ISC](https://opensource.org/license/isc).
 
-```text
-graph TD
-  A[Start] --> B{Logged in?}
-  B -->|Yes| C[Show home]
-  B -->|No| D[Show login]
-```
-
-Shapes the parser draws:
-
-| Write           | Meaning        |
-| --------------- | -------------- |
-| `A[Step]`       | A step         |
-| `B{Question?}`  | A decision     |
-| `C(Note)`       | A rounded step |
-| `D([Start])`    | A start or end |
-| `E[(Database)]` | A cylinder     |
-| `A --> B`       | An arrow       |
-| `B -->\|Yes\| C` | A labeled branch |
-
-`graph` and `flowchart` both work, with direction `TD`, `TB`, `LR`, `BT`, or `RL`. Subgraphs, dotted edges (`-.->`), and thick edges (`==>`) work too. Keep labels to a few words so the boxes stay readable.
-
-The returned markdown is already a fenced code block. Paste it into the reply as it is.
-
-## How it works
-
-The server is a stdio MCP process. `render-flowchart` checks that the source is a flowchart, parses it into nodes and edges, lays the graph out on a character grid, and draws it with Unicode box-drawing characters. The string that comes back is the diagram.
-
-## Limits
-
-The tool accepts `graph` and `flowchart` only. Anything else is an error, including sequence, class, state, ER, and XY charts.
-
-The picture is plain text. It needs a monospace font, which a markdown code block provides. A graph with many crossing loops can get crowded. A labeled arrow that leaves the side of a node can start a short gap away from the box. That comes from the grid layout we inherited. Short labels and a top-to-bottom direction avoid most of it.
+The renderer in `src/render` is MIT. The license text is in [src/render/LICENSE](src/render/LICENSE).
